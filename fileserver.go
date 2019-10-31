@@ -50,4 +50,5 @@ func main() {
 	}
 
 	<-idleConnsClosed
+	log.Printf("Done.")
 }
