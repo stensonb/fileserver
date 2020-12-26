@@ -1,8 +1,8 @@
 # fileserver
 
-this serves all files from "./" at localhost:1234
+this serves "./index.html" from localhost:1234 by default
 
 ## todo
+* package html into go binary - https://github.com/gobuffalo/packr
+* use chi/docgen to document all valid calls?
 * tests
-* make port a command-line parameter
-* make shutdown/timeout a command-line parameter
