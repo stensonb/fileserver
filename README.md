@@ -1,6 +1,9 @@
 # fileserver
 
-this serves "./index.html" from localhost:1234 by default
+To see all options, try:
+```
+./fileserver -h
+```
 
 ## todo
 * package html into go binary - https://github.com/gobuffalo/packr
