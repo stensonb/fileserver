@@ -17,11 +17,6 @@ import (
 	"github.com/go-chi/chi/middleware"
 )
 
-const (
-	// DefaultShutdownTimeoutSeconds is the longest this server will wait until killing all connections at shutdown
-	DefaultShutdownTimeoutSeconds = 60
-)
-
 var dataDir string
 var uploadDir string
 var listenPort int = 1234
