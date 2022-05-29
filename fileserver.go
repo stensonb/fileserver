@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -15,11 +17,14 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 var dataDir string
 var uploadDir string
+var listenAddress string = getLocalIP()
 var listenPort int = 1234
+var printQRCode bool = true
 var shutdownTimeout string = "60s"
 var parsedShutdownTimeout time.Duration
 
@@ -34,7 +39,9 @@ func init() {
 
 	flag.StringVar(&dataDir, "dataDir", dataDir, "directory to serve from")
 	flag.StringVar(&uploadDir, "uploadDir", uploadDir, "directory to upload to")
+	flag.StringVar(&listenAddress, "address", listenAddress, "address to listen on")
 	flag.IntVar(&listenPort, "p", listenPort, "port to listen on")
+	flag.BoolVar(&printQRCode, "qrcode", printQRCode, "print QRCode")
 	flag.StringVar(&shutdownTimeout, "t", shutdownTimeout, "maximum time to wait for a clean shutdown")
 }
 
@@ -54,6 +61,12 @@ func main() {
 	parsedShutdownTimeout, err := time.ParseDuration(shutdownTimeout)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	ipPortCombo := fmt.Sprintf("%s:%s", listenAddress, strconv.Itoa(listenPort))
+	theURL := url.URL{
+		Scheme: "http",
+		Host:   ipPortCombo,
 	}
 
 	// the default http server
@@ -85,18 +98,18 @@ func main() {
 	r.Get("/*", wrapHandler(http.FileServer(http.Dir(dataDir))))
 	r.Post("/uploadFile", uploadFile)
 
-	listenAddr := fmt.Sprintf(":%s", strconv.Itoa(listenPort))
 	log.Printf("Serving files from %s\n", dataDir)
 	log.Printf("Uploaded files stored in %s\n", uploadDir)
-	log.Printf("Listening on %s\n", listenAddr)
+	log.Printf("Listening at %s\n", theURL.String())
+	if printQRCode {
+		log.Printf("\n%s", getQRCode(theURL.String()))
+	}
 
 	// blocking call, running the server
-	srv.Addr = listenAddr
+	srv.Addr = theURL.Host
 	srv.Handler = r
 
 	if err = srv.ListenAndServe(); err != http.ErrServerClosed {
-
-		//	if err = srv.ListenAndServe(listenAddr, r); err != http.ErrServerClosed {
 		log.Fatalf("HTTP server ListenAndServe: %v", err)
 	}
 
@@ -161,4 +174,30 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 		defer resFile.Close()
 		fmt.Fprintf(w, "Successfully Uploaded Original File\n")
 	}
+}
+
+// getLocalIP returns the non loopback local IP of the host
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
+}
+
+func getQRCode(s string) string {
+	q, err := qrcode.New(s, qrcode.Low)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return q.ToString(false)
 }
