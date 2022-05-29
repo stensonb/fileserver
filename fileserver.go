@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"embed"
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
@@ -13,10 +15,11 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	qrcode "github.com/skip2/go-qrcode"
 )
 
@@ -27,6 +30,9 @@ var listenPort int = 1234
 var printQRCode bool = true
 var shutdownTimeout string = "60s"
 var parsedShutdownTimeout time.Duration
+
+//go:embed html/*
+var content embed.FS
 
 func init() {
 	var err error
@@ -40,9 +46,9 @@ func init() {
 	flag.StringVar(&dataDir, "dataDir", dataDir, "directory to serve from")
 	flag.StringVar(&uploadDir, "uploadDir", uploadDir, "directory to upload to")
 	flag.StringVar(&listenAddress, "address", listenAddress, "address to listen on")
-	flag.IntVar(&listenPort, "p", listenPort, "port to listen on")
+	flag.IntVar(&listenPort, "port", listenPort, "port to listen on")
 	flag.BoolVar(&printQRCode, "qrcode", printQRCode, "print QRCode")
-	flag.StringVar(&shutdownTimeout, "t", shutdownTimeout, "maximum time to wait for a clean shutdown")
+	flag.StringVar(&shutdownTimeout, "timeout", shutdownTimeout, "maximum time to wait for a clean shutdown")
 }
 
 func main() {
@@ -95,7 +101,13 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	r.Get("/*", wrapHandler(http.FileServer(http.Dir(dataDir))))
+	fsys, err := fs.Sub(content, "html")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	FileServer(r, "/", http.FS(fsys))
+	FileServer(r, "/data", http.Dir(dataDir))
 	r.Post("/uploadFile", uploadFile)
 
 	log.Printf("Serving files from %s\n", dataDir)
@@ -134,17 +146,6 @@ func (w *NotFoundRedirectRespWr) Write(p []byte) (int, error) {
 		return w.ResponseWriter.Write(p)
 	}
 	return len(p), nil // Lie that we successfully written it
-}
-
-func wrapHandler(h http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		nfrw := &NotFoundRedirectRespWr{ResponseWriter: w}
-		h.ServeHTTP(nfrw, r)
-		if nfrw.status == 404 {
-			log.Printf("Redirecting %s to index.html.", r.RequestURI)
-			http.Redirect(w, r, "/index.html", http.StatusFound)
-		}
-	}
 }
 
 func uploadFile(w http.ResponseWriter, r *http.Request) {
@@ -200,4 +201,25 @@ func getQRCode(s string) string {
 	}
 
 	return q.ToString(false)
+}
+
+// FileServer conveniently sets up a http.FileServer handler to serve
+// static files from a http.FileSystem.
+func FileServer(r chi.Router, path string, root http.FileSystem) {
+	if strings.ContainsAny(path, "{}*") {
+		panic("FileServer does not permit any URL parameters.")
+	}
+
+	if path != "/" && path[len(path)-1] != '/' {
+		r.Get(path, http.RedirectHandler(path+"/", http.StatusMovedPermanently).ServeHTTP)
+		path += "/"
+	}
+	path += "*"
+
+	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
+		rctx := chi.RouteContext(r.Context())
+		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
+		fs := http.StripPrefix(pathPrefix, http.FileServer(root))
+		fs.ServeHTTP(w, r)
+	})
 }
