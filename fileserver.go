@@ -54,8 +54,8 @@ func init() {
 func main() {
 	flag.Parse()
 
-        dataDir = filepath.Clean(dataDir)
-        uploadDir = filepath.Clean(uploadDir)
+	dataDir = filepath.Clean(dataDir)
+	uploadDir = filepath.Clean(uploadDir)
 
 	var err error
 	err = os.MkdirAll(dataDir, 0700)

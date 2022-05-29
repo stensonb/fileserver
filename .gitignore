@@ -2,3 +2,5 @@ fileserver
 .DS_Store
 .vscode
 data/
+
+dist/
