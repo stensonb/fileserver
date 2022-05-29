@@ -6,6 +6,5 @@ To see all options, try:
 ```
 
 ## todo
-* package html into go binary - https://github.com/gobuffalo/packr
 * use chi/docgen to document all valid calls?
 * tests
