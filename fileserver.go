@@ -2,12 +2,19 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"embed"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"io"
 	"io/fs"
 	"log"
+	"math/big"
 	"net"
 	"net/http"
 	"net/url"
@@ -23,6 +30,11 @@ import (
 	qrcode "github.com/skip2/go-qrcode"
 )
 
+const (
+	domain = "siliconvortex.com"
+	name   = "fileserver"
+)
+
 var dataDir string
 var uploadDir string
 var listenAddress string = getLocalIP()
@@ -30,17 +42,25 @@ var listenPort int = 1234
 var printQRCode bool = true
 var shutdownTimeout string = "60s"
 var parsedShutdownTimeout time.Duration
+var tlsEnabled bool = true
+var tlsSelfSigned bool = true
+var tlsCertPath string = "cert.pem"
+var tlsKeyPath string = "cert.key"
 
 //go:embed html/*
 var content embed.FS
 
 func init() {
 	var err error
-	dataDir, err = os.Getwd()
+	baseDir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
-	dataDir = filepath.Join(dataDir, "data")
+
+	tlsCertPath = filepath.Join(baseDir, tlsCertPath)
+	tlsKeyPath = filepath.Join(baseDir, tlsKeyPath)
+
+	dataDir = filepath.Join(baseDir, "data")
 	uploadDir = filepath.Join(dataDir, "uploads")
 
 	flag.StringVar(&dataDir, "dataDir", dataDir, "directory to serve from")
@@ -48,7 +68,63 @@ func init() {
 	flag.StringVar(&listenAddress, "address", listenAddress, "address to listen on")
 	flag.IntVar(&listenPort, "port", listenPort, "port to listen on")
 	flag.BoolVar(&printQRCode, "qrcode", printQRCode, "print QRCode")
+	flag.BoolVar(&tlsEnabled, "tls", tlsEnabled, "host with tls")
+	flag.BoolVar(&tlsSelfSigned, "tls-self-signed", tlsSelfSigned, "use self-signed cert/key combo")
+	flag.StringVar(&tlsCertPath, "tls-cert-path", tlsCertPath, "path for tls cert if tls-self-signed=false")
+	flag.StringVar(&tlsKeyPath, "tls-key-path", tlsKeyPath, "path for tls cert if tls-self-signed=false")
 	flag.StringVar(&shutdownTimeout, "timeout", shutdownTimeout, "maximum time to wait for a clean shutdown")
+}
+
+func rsaPrivateKeyAsPemBytes(privkey *rsa.PrivateKey) []byte {
+	privkey_bytes := x509.MarshalPKCS1PrivateKey(privkey)
+	privkey_pem := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: privkey_bytes,
+		},
+	)
+	return privkey_pem
+}
+
+func tlsConfigSelfSigned() (*tls.Config, error) {
+	now := time.Now()
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(now.Unix()),
+		Subject: pkix.Name{
+			CommonName:         fmt.Sprintf("%s.%s", name, domain),
+			Country:            []string{"Earth"},
+			Organization:       []string{"siliconvortex.com"},
+			OrganizationalUnit: []string{name},
+		},
+		NotBefore:             now,
+		NotAfter:              now.AddDate(0, 0, 7), // Valid for seven days
+		SubjectKeyId:          []byte(name),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		KeyUsage: x509.KeyUsageKeyEncipherment |
+			x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+	}
+
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, fmt.Errorf("failed to genrate key: %w", err)
+	}
+
+	certBytes, err := x509.CreateCertificate(rand.Reader, template, template, privKey.Public(), privKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create certificate: %w", err)
+	}
+
+	return &tls.Config{
+		ServerName: name,
+		Certificates: []tls.Certificate{
+			{
+				Certificate: [][]byte{certBytes},
+				PrivateKey:  privKey,
+			},
+		},
+	}, nil
 }
 
 func main() {
@@ -73,13 +149,29 @@ func main() {
 	}
 
 	ipPortCombo := fmt.Sprintf("%s:%s", listenAddress, strconv.Itoa(listenPort))
-	theURL := url.URL{
-		Scheme: "http",
-		Host:   ipPortCombo,
+
+	scheme := "http"
+	srv := &http.Server{}
+
+	if tlsEnabled {
+		scheme = "https"
+
+		var tlsConfig *tls.Config
+		if tlsSelfSigned {
+			// the default http server with tlsConfig
+			tlsConfig, err = tlsConfigSelfSigned()
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		srv.TLSConfig = tlsConfig
 	}
 
-	// the default http server
-	srv := &http.Server{}
+	theURL := url.URL{
+		Scheme: scheme,
+		Host:   ipPortCombo,
+	}
 
 	idleConnsClosed := make(chan struct{})
 
@@ -125,8 +217,21 @@ func main() {
 	srv.Addr = theURL.Host
 	srv.Handler = r
 
-	if err = srv.ListenAndServe(); err != http.ErrServerClosed {
-		log.Fatalf("HTTP server ListenAndServe: %v", err)
+	if tlsEnabled {
+		if tlsSelfSigned {
+			// server already as tlsConfig, so it will ignore the cert/key empty strings here
+			if err = srv.ListenAndServeTLS("", ""); err != http.ErrServerClosed {
+				log.Fatalf("HTTP server ListenAndServeTLS self-signed: %v", err)
+			}
+		} else {
+			if err = srv.ListenAndServeTLS(tlsCertPath, tlsKeyPath); err != http.ErrServerClosed {
+				log.Fatalf("HTTP server ListenAndServeTLS path: %v", err)
+			}
+		}
+	} else {
+		if err = srv.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("HTTP server ListenAndServe: %v", err)
+		}
 	}
 
 	<-idleConnsClosed
