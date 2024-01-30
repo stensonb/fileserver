@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"embed"
-	"encoding/pem"
 	"flag"
 	"fmt"
 	"io"
@@ -28,6 +27,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	qrcode "github.com/skip2/go-qrcode"
+	"github.com/stensonb/fileserver/pkg/safepath"
 )
 
 const (
@@ -41,7 +41,6 @@ var listenAddress string = getLocalIP()
 var listenPort int = 1234
 var printQRCode bool = true
 var shutdownTimeout string = "60s"
-var parsedShutdownTimeout time.Duration
 var tlsEnabled bool = true
 var tlsSelfSigned bool = true
 var tlsCertPath string = "cert.pem"
@@ -73,17 +72,6 @@ func init() {
 	flag.StringVar(&tlsCertPath, "tls-cert-path", tlsCertPath, "path for tls cert if tls-self-signed=false")
 	flag.StringVar(&tlsKeyPath, "tls-key-path", tlsKeyPath, "path for tls cert if tls-self-signed=false")
 	flag.StringVar(&shutdownTimeout, "timeout", shutdownTimeout, "maximum time to wait for a clean shutdown")
-}
-
-func rsaPrivateKeyAsPemBytes(privkey *rsa.PrivateKey) []byte {
-	privkey_bytes := x509.MarshalPKCS1PrivateKey(privkey)
-	privkey_pem := pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: privkey_bytes,
-		},
-	)
-	return privkey_pem
 }
 
 func tlsConfigSelfSigned() (*tls.Config, error) {
@@ -273,17 +261,27 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	fileToCreate := filepath.Clean(filepath.Join(uploadDir, handler.Filename))
+	safeFileName, err := safepath.Clean(handler.Filename)
+	if err != nil {
+		log.Println(err)
+		fmt.Fprintln(w, fmt.Errorf("bad filename"))
+		return
+	}
 
-	resFile, err := os.Create(fileToCreate)
+	resFile, err := os.Create(filepath.Clean(filepath.Join(uploadDir, safeFileName)))
 	if err != nil {
 		fmt.Fprintln(w, err)
 	}
 	defer resFile.Close()
 
 	if err == nil {
-		io.Copy(resFile, file)
-		defer resFile.Close()
+		_, err := io.Copy(resFile, file)
+		if err != nil {
+			log.Println(err)
+			fmt.Fprintln(w, fmt.Errorf("failed to upload file"))
+			return
+		}
+		log.Printf("uploaded: %s", resFile.Name())
 		fmt.Fprintf(w, "Successfully Uploaded Original File\n")
 	}
 }
