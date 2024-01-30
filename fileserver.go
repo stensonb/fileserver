@@ -273,7 +273,9 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	resFile, err := os.Create(filepath.Join(uploadDir, handler.Filename))
+	fileToCreate := filepath.Clean(filepath.Join(uploadDir, handler.Filename))
+
+	resFile, err := os.Create(fileToCreate)
 	if err != nil {
 		fmt.Fprintln(w, err)
 	}
