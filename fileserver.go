@@ -259,7 +259,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }
 
 	safeFileName, err := safepath.Clean(handler.Filename)
 	if err != nil {
@@ -272,13 +272,13 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_, _ = fmt.Fprintln(w, err)
 	}
-	defer resFile.Close()
+	defer func() { _ = resFile.Close() }
 
 	if err == nil {
 		_, err := io.Copy(resFile, file)
 		if err != nil {
 			log.Println(err)
-			fmt.Fprintln(w, fmt.Errorf("failed to upload file"))
+			_, _ = fmt.Fprintln(w, fmt.Errorf("failed to upload file"))
 			return
 		}
 		log.Printf("uploaded: %s", resFile.Name())
