@@ -46,7 +46,7 @@ var tlsSelfSigned bool = true
 var tlsCertPath string = "cert.pem"
 var tlsKeyPath string = "cert.key"
 
-//go:embed html/*
+//go:embed frontend/*
 var content embed.FS
 
 func init() {
@@ -184,7 +184,7 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	fsys, err := fs.Sub(content, "html")
+	fsys, err := fs.Sub(content, "frontend")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func main() {
 	FileServer(r, "/", http.FS(fsys))
 	FileServer(r, "/data", http.Dir(dataDir))
 	FileServer(r, "/uploads", http.Dir(uploadDir))
-	r.Post("/uploadFile", uploadFile)
+	r.Post("/uploader/upload", uploadFile)
 
 	log.Printf("Serving files from %s\n", dataDir)
 	log.Printf("Uploaded files stored in %s\n", uploadDir)
@@ -249,40 +249,40 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	//upload size
 	err := r.ParseMultipartForm(200000) // grab the multipart form
 	if err != nil {
-		fmt.Fprintln(w, err)
+		_, _ = fmt.Fprintln(w, err)
 	}
 
 	//reading original file
-	file, handler, err := r.FormFile("originalFile")
+	file, handler, err := r.FormFile("file")
 	if err != nil {
 		log.Println("Error Retrieving the File")
 		log.Println(err)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	safeFileName, err := safepath.Clean(handler.Filename)
 	if err != nil {
 		log.Println(err)
-		fmt.Fprintln(w, fmt.Errorf("bad filename"))
+		_, _ = fmt.Fprintln(w, fmt.Errorf("bad filename"))
 		return
 	}
 
 	resFile, err := os.Create(filepath.Clean(filepath.Join(uploadDir, safeFileName)))
 	if err != nil {
-		fmt.Fprintln(w, err)
+		_, _ = fmt.Fprintln(w, err)
 	}
-	defer resFile.Close()
+	defer func() { _ = resFile.Close() }()
 
 	if err == nil {
 		_, err := io.Copy(resFile, file)
 		if err != nil {
 			log.Println(err)
-			fmt.Fprintln(w, fmt.Errorf("failed to upload file"))
+			_, _ = fmt.Fprintln(w, fmt.Errorf("failed to upload file"))
 			return
 		}
 		log.Printf("uploaded: %s", resFile.Name())
-		fmt.Fprintf(w, "Successfully Uploaded Original File\n")
+		_, _ = fmt.Fprintf(w, "Successfully Uploaded Original File\n")
 	}
 }
 
