@@ -2,4 +2,4 @@
 
 package unveil
 
-func Unveil(string) error { return nil }
+func Unveil(...string) error { return nil }

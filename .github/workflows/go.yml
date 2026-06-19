@@ -38,7 +38,7 @@ jobs:
       with:
         usesh: true
         prepare: |
-          pkg_add golang
+          pkg_add go
 
         run: |
           tree /home/runner/work
