@@ -28,6 +28,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	qrcode "github.com/skip2/go-qrcode"
 	"github.com/stensonb/fileserver/pkg/safepath"
+	"github.com/stensonb/fileserver/pkg/unveil"
 )
 
 const (
@@ -129,6 +130,10 @@ func main() {
 	err = os.MkdirAll(uploadDir, 0700)
 	if err != nil {
 		log.Println(err)
+	}
+
+	if err := unveil.Unveil(dataDir, uploadDir); err != nil {
+		log.Fatal(err)
 	}
 
 	parsedShutdownTimeout, err := time.ParseDuration(shutdownTimeout)

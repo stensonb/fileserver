@@ -18,6 +18,9 @@ github.com/skip2/go-qrcode/reedsolomon
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
 github.com/stretchr/testify/require
+# golang.org/x/sys v0.46.0
+## explicit; go 1.25.0
+golang.org/x/sys/unix
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3

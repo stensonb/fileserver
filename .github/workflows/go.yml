@@ -9,20 +9,40 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
 jobs:
 
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v6
       with:
-        go-version: '1.21'
+        go-version-file: 'go.mod'
 
     - name: Build
       run: go build -v ./...
 
     - name: Test
       run: go test -v ./...
+
+  build-openbsd:
+    runs-on: ubuntu-latest
+    name: build on OpenBSD
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: build in OpenBSD
+      id: build-openbsd
+      uses: vmactions/openbsd-vm@v1
+      with:
+        usesh: true
+        prepare: |
+          pkg_add go
+
+        run: |
+          go build -v ./...
