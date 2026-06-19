@@ -249,7 +249,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	//upload size
 	err := r.ParseMultipartForm(200000) // grab the multipart form
 	if err != nil {
-		_ := fmt.Fprintln(w, err)
+		_ = fmt.Fprintln(w, err)
 	}
 
 	//reading original file
@@ -264,13 +264,13 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	safeFileName, err := safepath.Clean(handler.Filename)
 	if err != nil {
 		log.Println(err)
-		_ := fmt.Fprintln(w, fmt.Errorf("bad filename"))
+		_ = fmt.Fprintln(w, fmt.Errorf("bad filename"))
 		return
 	}
 
 	resFile, err := os.Create(filepath.Clean(filepath.Join(uploadDir, safeFileName)))
 	if err != nil {
-		_ := fmt.Fprintln(w, err)
+		_ = fmt.Fprintln(w, err)
 	}
 	defer resFile.Close()
 
@@ -282,7 +282,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf("uploaded: %s", resFile.Name())
-		_ := fmt.Fprintf(w, "Successfully Uploaded Original File\n")
+		_ = fmt.Fprintf(w, "Successfully Uploaded Original File\n")
 	}
 }
 
