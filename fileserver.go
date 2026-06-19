@@ -249,14 +249,16 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	//upload size
 	err := r.ParseMultipartForm(200000) // grab the multipart form
 	if err != nil {
-		_, _ = fmt.Fprintln(w, err)
+		log.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	//reading original file
 	file, handler, err := r.FormFile("file")
 	if err != nil {
-		log.Println("Error Retrieving the File")
 		log.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	defer func() { _ = file.Close() }()
@@ -264,13 +266,15 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	safeFileName, err := safepath.Clean(handler.Filename)
 	if err != nil {
 		log.Println(err)
-		_, _ = fmt.Fprintln(w, fmt.Errorf("bad filename"))
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	resFile, err := os.Create(filepath.Clean(filepath.Join(uploadDir, safeFileName)))
 	if err != nil {
-		_, _ = fmt.Fprintln(w, err)
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	defer func() { _ = resFile.Close() }()
 
@@ -278,7 +282,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 		_, err := io.Copy(resFile, file)
 		if err != nil {
 			log.Println(err)
-			_, _ = fmt.Fprintln(w, fmt.Errorf("failed to upload file"))
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		log.Printf("uploaded: %s", resFile.Name())
