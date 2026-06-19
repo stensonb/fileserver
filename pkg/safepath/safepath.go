@@ -10,7 +10,7 @@ type TooManyConsecutiveDotsErr struct {}
 var _ error = &TooManyConsecutiveDotsErr{}
 
 func (m TooManyConsecutiveDotsErr) Error() string {
-	return fmt.Sprintf("too many consecutive dots")
+	return "too many consecutive dots"
 }
 
 type TooManyFileSeparatorsErr struct {
@@ -40,7 +40,7 @@ func Clean(input string) (string, error) {
 	// Do not allow more than a single "." character.
 	// Do not allow directory separators such as "/" or "\" (depending on the file system).
 
-	var lastRuneDot bool = false
+	var lastRuneDot bool
 	var fsCount uint = 0
 	dotRune := []rune(".")[0]
 
