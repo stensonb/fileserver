@@ -35,6 +35,7 @@ jobs:
     name: build on OpenBSD
     steps:
     - uses: actions/checkout@v6
+
     - name: build in OpenBSD
       id: build-openbsd
       uses: vmactions/openbsd-vm@v1
@@ -44,5 +45,4 @@ jobs:
           pkg_add go
 
         run: |
-          tree /home/runner/work
           go build -v ./...
