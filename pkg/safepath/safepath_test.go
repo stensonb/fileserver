@@ -21,9 +21,13 @@ func TestSafePath(t *testing.T) {
 			output:        "fine.foo",
 			expectedError: nil,
 		},
-		"bad.morethanone.dot": {
+		"fine.morethanone.dot": {
+			output:        "fine.morethanone.dot",
+			expectedError: nil,
+		},
+		"bad.morethanoneconsecutive..dot": {
 			output:        "",
-			expectedError: &TooManyDotsErr{},
+			expectedError: &TooManyConsecutiveDotsErr{},
 		},
 		fmt.Sprintf("bad%smorethanzeroslashes", string(filepath.Separator)): {
 			output:        "",

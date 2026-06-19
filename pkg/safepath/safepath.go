@@ -5,14 +5,12 @@ import (
 	"path/filepath"
 )
 
-type TooManyDotsErr struct {
-	dotCount uint
-}
+type TooManyConsecutiveDotsErr struct {}
 
-var _ error = &TooManyDotsErr{}
+var _ error = &TooManyConsecutiveDotsErr{}
 
-func (m TooManyDotsErr) Error() string {
-	return fmt.Sprintf("too many dots (%v)", m.dotCount)
+func (m TooManyConsecutiveDotsErr) Error() string {
+	return fmt.Sprintf("too many consecutive dots")
 }
 
 type TooManyFileSeparatorsErr struct {
@@ -42,21 +40,22 @@ func Clean(input string) (string, error) {
 	// Do not allow more than a single "." character.
 	// Do not allow directory separators such as "/" or "\" (depending on the file system).
 
-	var dotCount uint = 0
+	var lastRuneDot bool = false
 	var fsCount uint = 0
 	dotRune := []rune(".")[0]
 
 	for _, r := range input {
 		switch r {
 		case dotRune:
-			dotCount++
+			if lastRuneDot {
+				return "", TooManyConsecutiveDotsErr{}
+			}
+			lastRuneDot = true
 		case filepath.Separator:
 			fsCount++
+		default:
+			lastRuneDot = false
 		}
-	}
-
-	if dotCount > 1 {
-		return "", TooManyDotsErr{dotCount}
 	}
 
 	if fsCount > 0 {
