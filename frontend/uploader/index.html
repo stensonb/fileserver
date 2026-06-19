@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FileServer</title>
+    <link rel="stylesheet" href="/uploader/vendor/uppy.min.css" />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: sans-serif;
+        margin: 0;
+        padding: 16px;
+      }
+      h1 {
+        margin: 0 0 24px;
+        font-size: clamp(1.25rem, 5vw, 2rem);
+      }
+      #dashboard {
+        width: 100%;
+        max-width: 860px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>FileServer</h1>
+    <div id="dashboard"></div>
+    <script src="/uploader/vendor/uppy.min.js"></script>
+    <script>
+      const { Uppy, Dashboard, XHRUpload } = window.Uppy;
+      new Uppy()
+        .use(Dashboard, { inline: true, target: "#dashboard" })
+        .use(XHRUpload, { endpoint: "/uploader/upload", fieldName: "file" });
+    </script>
+  </body>
+</html>

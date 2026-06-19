@@ -46,7 +46,7 @@ var tlsSelfSigned bool = true
 var tlsCertPath string = "cert.pem"
 var tlsKeyPath string = "cert.key"
 
-//go:embed html/*
+//go:embed frontend/*
 var content embed.FS
 
 func init() {
@@ -184,7 +184,7 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	fsys, err := fs.Sub(content, "html")
+	fsys, err := fs.Sub(content, "frontend")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func main() {
 	FileServer(r, "/", http.FS(fsys))
 	FileServer(r, "/data", http.Dir(dataDir))
 	FileServer(r, "/uploads", http.Dir(uploadDir))
-	r.Post("/uploadFile", uploadFile)
+	r.Post("/uploader/upload", uploadFile)
 
 	log.Printf("Serving files from %s\n", dataDir)
 	log.Printf("Uploaded files stored in %s\n", uploadDir)
@@ -253,7 +253,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//reading original file
-	file, handler, err := r.FormFile("originalFile")
+	file, handler, err := r.FormFile("file")
 	if err != nil {
 		log.Println("Error Retrieving the File")
 		log.Println(err)
